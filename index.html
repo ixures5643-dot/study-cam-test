@@ -6,8 +6,8 @@
 <meta name="robots" content="noindex">
 <title>撮影判定テスト</title>
 <link rel="icon" href="data:,">
-<link rel="stylesheet" href="style.css?v=2">
-<script type="module" src="app.js?v=2"></script>
+<link rel="stylesheet" href="style.css?v=3">
+<script type="module" src="app.js?v=3"></script>
 </head>
 <body>
 <main>
@@ -48,14 +48,12 @@
     <div class="row small">
       <span>人がいない <b id="tAway">0:00</b></span>
       <span>動きがない <b id="tStill">0:00</b></span>
-      <span>スマホを持っている <b id="tPhone">0:00</b></span>
     </div>
   </section>
 
   <section id="check" class="panel">
     <span id="ckPose" class="chip">肩・顔 —</span>
     <span id="ckFace" class="chip">顔（まばたき用） —</span>
-    <span id="ckDesk" class="chip">机 —</span>
   </section>
 
   <section id="result" class="panel" hidden>
@@ -73,7 +71,6 @@
       <dt>体の揺れ</dt><dd id="mJit">—</dd>
       <dt>画素の変化</dt><dd id="mDiff">—</dd>
       <dt>まばたき</dt><dd id="mBlink">—</dd>
-      <dt>見えた物</dt><dd id="mObj">—</dd>
       <dt>今の判定</dt><dd id="mRaw">—</dd>
     </dl>
   </details>
@@ -84,11 +81,10 @@
     <label>画素の変化 ＞ <output id="oDiff"></output><input id="pDiff" type="range" min="0" max="5" step="0.05"></label>
     <label>まばたきから <output id="oBlink"></output> 秒は動きありとみなす<input id="pBlink" type="range" min="0" max="60" step="1"></label>
     <label>直近 <output id="oHold"></output> 秒の7割が同じ判定なら切り替え<input id="pHold" type="range" min="1" max="15" step="1"></label>
-    <label>スマホ検出の確からしさ ＞ <output id="oObj"></output><input id="pObj" type="range" min="0.1" max="0.9" step="0.05"></label>
     <button id="btnReset">初期値に戻す</button>
   </details>
 
-  <p class="note">映像はこの端末の中だけで処理し、保存も送信もしません。最初の読み込みで判定用のAI（約30MB）を取得します。</p>
+  <p class="note">映像はこの端末の中だけで処理し、保存も送信もしません。最初の読み込みで判定用のAIを取得します。</p>
 </main>
 </body>
 </html>

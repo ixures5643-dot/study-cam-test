@@ -1,7 +1,7 @@
 // 撮影判定テスト — 勉強している時間だけを数えられるかを試す。
 // 映像は端末の中で MediaPipe に通すだけで、保存も送信もしない。
 
-const APP_VER = 'v2';
+const APP_VER = 'v3';
 const MP_VER = '1.2.2';
 const MP_CDN = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MP_VER}`;
 const M = 'https://storage.googleapis.com/mediapipe-models';
@@ -19,6 +19,7 @@ const FORCE_CPU = qs.has('cpu');
 // v2（2026-11-11 iPhone 1回目）: 写真は揺れ0.010〜0.012・変化0.00、じっと読む人は揺れ0.0075〜0.015・変化0.29〜1.63
 // ＝揺れは写真の雑音と重なるので大きな動きだけに使い、生きている印は「変化」と「まばたき」で見る
 const DEFAULTS = { jit: 0.05, diff: 0.1, blink: 20, hold: 5, obj: 0.35 };
+// v3（同日 本人「写真のときと離席だけ止めよう」）: スマホ・ゲーム機の判定と物の検出を外した
 const PKEY = 'studycam.params.v2';
 const WIN_MS = 10000;      // 揺れ・画素の変化を見る幅
 const PROC_MS = 66;        // 処理の間隔（約15fps）
@@ -38,10 +39,6 @@ const ALL_SCENES = [
     text: 'ノートに書く・計算するなど、普段どおりに勉強してください。' },
   { id: 'read', name: '読んで勉強', sec: 120, prep: 10, expect: 'count',
     text: '本や紙を読むだけにして、なるべく手を動かさず、じっと読んでください。' },
-  { id: 'phone', name: 'スマホを持つ', sec: 90, prep: 10, expect: 'phone',
-    text: '別のスマホ（無ければタブレット）を手に持って、普段どおりに触ってください。' },
-  { id: 'game', name: 'ゲーム機を持つ', sec: 60, prep: 10, expect: 'phone',
-    text: 'ゲーム機を手に持って遊ぶ姿勢をしてください。持っていなければ「この場面を飛ばす」。' },
   { id: 'away', name: '席を外す', sec: 60, prep: 15, expect: 'away',
     text: '始めたらカメラに映らない所へ離れ、1分半ほどたってから戻ってください。' },
   { id: 'photo', name: '写真を立てる', sec: 90, prep: 20, expect: 'still',
@@ -96,20 +93,15 @@ function setLoading(msg) {
 async function createModels(delegate) {
   const mp = await import(`${MP_CDN}/vision_bundle.mjs`);
   if (!vision) vision = await mp.FilesetResolver.forVisionTasks(`${MP_CDN}/wasm`);
-  setLoading(`判定用のAIを読み込み中（1/3 体の位置・${delegate}）…`);
+  setLoading(`判定用のAIを読み込み中（1/2 体の位置・${delegate}）…`);
   pose = await mp.PoseLandmarker.createFromOptions(vision, {
     baseOptions: { modelAssetPath: MODEL.pose, delegate },
     runningMode: 'VIDEO', numPoses: 1,
   });
-  setLoading(`判定用のAIを読み込み中（2/3 顔・まばたき・${delegate}）…`);
+  setLoading(`判定用のAIを読み込み中（2/2 顔・まばたき・${delegate}）…`);
   face = await mp.FaceLandmarker.createFromOptions(vision, {
     baseOptions: { modelAssetPath: MODEL.face, delegate },
     runningMode: 'VIDEO', numFaces: 1, outputFaceBlendshapes: true,
-  });
-  setLoading(`判定用のAIを読み込み中（3/3 物の検出・${delegate}）…`);
-  obj = await mp.ObjectDetector.createFromOptions(vision, {
-    baseOptions: { modelAssetPath: delegate === 'GPU' ? MODEL.objGPU : MODEL.objCPU, delegate },
-    runningMode: 'VIDEO', scoreThreshold: 0.25, maxResults: 8,
   });
   S.delegate = delegate;
 }
@@ -289,7 +281,7 @@ function processFrame(now) {
   const dif = S.diffWin.length >= 8 ? S.diffWin.reduce((a, b) => a + b.v, 0) / S.diffWin.length : null;
 
   // 物の検出（約1秒に1回）
-  if (now - S.lastObjT >= OBJ_MS) {
+  if (obj && now - S.lastObjT >= OBJ_MS) { // v3 から obj は読み込まない＝ここは通らない
     S.lastObjT = now;
     const or = obj.detectForVideo(video, now);
     const list = (or.detections || []).map((d) => {
@@ -412,15 +404,12 @@ function updateUI(now) {
   $('tCount').textContent = fmt(S.totals.count);
   $('tAway').textContent = fmt(S.totals.away);
   $('tStill').textContent = fmt(S.totals.still);
-  $('tPhone').textContent = fmt(S.totals.phone);
   setChip('ckPose', c.present, '肩・顔');
   setChip('ckFace', c.faceOn, '顔（まばたき用）');
-  setChip('ckDesk', now - S.deskT < 5000, '机');
   $('mFps').textContent = c.fps.toFixed(1);
   $('mJit').textContent = c.jit == null ? '（集計中）' : `${c.jit.toFixed(4)}（${c.jit > P.jit ? '動きあり' : '動きなし'}）`;
   $('mDiff').textContent = c.dif == null ? '（集計中）' : `${c.dif.toFixed(2)}（${c.dif > P.diff ? '動きあり' : '動きなし'}）`;
   $('mBlink').textContent = `${S.blinks}回・最後から ${isFinite(c.blinkAgo) ? c.blinkAgo.toFixed(0) + '秒' : '—'}${c.blinkAvg == null ? '' : `・目の閉じ ${c.blinkAvg.toFixed(2)}`}`;
-  $('mObj').textContent = S.det.list.map((d) => `${LABEL_JA[d.label] || d.label} ${d.score.toFixed(2)}`).join('、') || 'なし';
   $('mRaw').textContent = `${STATE_JA[c.raw]}${c.raw !== S.disp ? `（直近${P.hold}秒の7割になったら切り替え）` : ''}`;
 }
 
@@ -538,14 +527,13 @@ function resultText() {
   const d = new Date();
   L.push(`撮影判定テスト ${APP_VER} / ${d.toLocaleString('ja-JP')} / ${S.delegate} / 読込${(S.loadMs / 1000).toFixed(1)}秒 / 映像${video.videoWidth}x${video.videoHeight}${SPEED > 1 ? ` / 速度x${SPEED}` : ''}`);
   L.push(`端末: ${navigator.userAgent}`);
-  L.push(`設定: 揺れ>${P.jit} 変化>${P.diff} まばたき${P.blink}秒 切替${P.hold}秒 スマホ>${P.obj}`);
+  L.push(`設定: 揺れ>${P.jit} 変化>${P.diff} まばたき${P.blink}秒 切替${P.hold}秒`);
   L.push('（各場面の最初の10秒は除いて集計。正解＝その場面で出るべき判定の割合）');
   for (const r of S.results) {
     if (r.skipped) { L.push(`[${SCENES.find((s) => s.id === r.id).name}] 飛ばした`); continue; }
-    L.push(`[${r.name}] ${r.sec}秒(判定${r.judged}秒) 正解${r.ok}%（判定の素${r.rawOk}%） 数え${r.count} 不在${r.away} 静止${r.still} スマホ${r.phone}`);
-    L.push(`  揺れ p10/50/90=${f(r.jit[0], 4)}/${f(r.jit[1], 4)}/${f(r.jit[2], 4)} 変化 最小/p10/50/90=${f(r.dif[0], 2)}/${f(r.dif[1], 2)}/${f(r.dif[2], 2)}/${f(r.dif[3], 2)} まばたき${r.blinks}回 顔${r.face}% 体${r.pose}% 手にスマホ${r.hold}% fps${r.fps.toFixed(1)}`);
+    L.push(`[${r.name}] ${r.sec}秒(判定${r.judged}秒) 正解${r.ok}%（判定の素${r.rawOk}%） 数え${r.count} 不在${r.away} 静止${r.still}`);
+    L.push(`  揺れ p10/50/90=${f(r.jit[0], 4)}/${f(r.jit[1], 4)}/${f(r.jit[2], 4)} 変化 最小/p10/50/90=${f(r.dif[0], 2)}/${f(r.dif[1], 2)}/${f(r.dif[2], 2)}/${f(r.dif[3], 2)} まばたき${r.blinks}回 顔${r.face}% 体${r.pose}% fps${r.fps.toFixed(1)}`);
     L.push(`  変化の線ごとの動きあり%: ${r.sweep}`);
-    L.push(`  見えた物: ${r.labels || 'なし'}`);
     L.push(`  時系列: ${r.line}`);
   }
   if (S.errors.length) L.push('エラー: ' + S.errors.join(' / '));
@@ -576,7 +564,7 @@ async function copyResult() {
 
 // ---------- しきい値 ----------
 
-const TUNE = [['pJit', 'oJit', 'jit', 3], ['pDiff', 'oDiff', 'diff', 2], ['pBlink', 'oBlink', 'blink', 0], ['pHold', 'oHold', 'hold', 0], ['pObj', 'oObj', 'obj', 2]];
+const TUNE = [['pJit', 'oJit', 'jit', 3], ['pDiff', 'oDiff', 'diff', 2], ['pBlink', 'oBlink', 'blink', 0], ['pHold', 'oHold', 'hold', 0]];
 function syncTune() {
   for (const [inp, out, key, dg] of TUNE) { $(inp).value = P[key]; $(out).textContent = Number(P[key]).toFixed(dg); }
 }
