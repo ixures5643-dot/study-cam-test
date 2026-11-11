@@ -1,7 +1,7 @@
 // 撮影判定テスト — 勉強している時間だけを数えられるかを試す。
 // 映像は端末の中で MediaPipe に通すだけで、保存も送信もしない。
 
-const APP_VER = 'v1';
+const APP_VER = 'v2';
 const MP_VER = '1.2.2';
 const MP_CDN = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MP_VER}`;
 const M = 'https://storage.googleapis.com/mediapipe-models';
@@ -16,7 +16,10 @@ const qs = new URLSearchParams(location.search);
 const SPEED = Math.max(1, Number(qs.get('speed')) || 1); // 試験の時間を縮める（PCでの確認用）
 const FORCE_CPU = qs.has('cpu');
 
-const DEFAULTS = { jit: 0.010, diff: 1.5, blink: 20, hold: 5, obj: 0.35 };
+// v2（2026-11-11 iPhone 1回目）: 写真は揺れ0.010〜0.012・変化0.00、じっと読む人は揺れ0.0075〜0.015・変化0.29〜1.63
+// ＝揺れは写真の雑音と重なるので大きな動きだけに使い、生きている印は「変化」と「まばたき」で見る
+const DEFAULTS = { jit: 0.05, diff: 0.1, blink: 20, hold: 5, obj: 0.35 };
+const PKEY = 'studycam.params.v2';
 const WIN_MS = 10000;      // 揺れ・画素の変化を見る幅
 const PROC_MS = 66;        // 処理の間隔（約15fps）
 const OBJ_MS = 1000;       // 物体検出の間隔
@@ -30,7 +33,7 @@ const LABEL_JA = {
   'bottle': 'ボトル', 'chair': '椅子', 'clock': '時計', 'scissors': 'はさみ', 'teddy bear': 'ぬいぐるみ',
 };
 
-const SCENES = [
+const ALL_SCENES = [
   { id: 'write', name: '書いて勉強', sec: 120, prep: 10, expect: 'count',
     text: 'ノートに書く・計算するなど、普段どおりに勉強してください。' },
   { id: 'read', name: '読んで勉強', sec: 120, prep: 10, expect: 'count',
@@ -44,6 +47,9 @@ const SCENES = [
   { id: 'photo', name: '写真を立てる', sec: 90, prep: 20, expect: 'still',
     text: '人の写真（紙、または別の画面に出した写真）をカメラの前に立て、自分は映らない所へ離れてください。2分ほどたったら戻ってください。' },
 ];
+// ?scenes=read,phone,photo で場面を絞る（2回目以降の短い試験用）
+const pick = (qs.get('scenes') || '').split(',').map((id) => ALL_SCENES.find((sc) => sc.id === id.trim())).filter(Boolean);
+const SCENES = pick.length ? pick : ALL_SCENES;
 
 const $ = (id) => document.getElementById(id);
 const video = $('video');
@@ -53,7 +59,7 @@ const small = document.createElement('canvas');
 const sctx = small.getContext('2d', { willReadFrequently: true });
 
 let P = { ...DEFAULTS };
-try { Object.assign(P, JSON.parse(localStorage.getItem('studycam.params') || '{}')); } catch (_) {}
+try { Object.assign(P, JSON.parse(localStorage.getItem(PKEY) || '{}')); } catch (_) {}
 
 const S = {
   appVer: APP_VER, delegate: null, loadMs: 0, started: false,
@@ -508,7 +514,12 @@ function summarize(sc) {
     count: share('count'), away: share('away'), still: share('still'), phone: share('phone'),
     rawOk: Math.round(100 * recs.filter((r) => r.raw === sc.expect).length / n),
     jit: [0.1, 0.5, 0.9].map((p) => pct(nums('jit'), p)),
-    dif: [0.1, 0.5, 0.9].map((p) => pct(nums('dif'), p)),
+    dif: [0, 0.1, 0.5, 0.9].map((p) => pct(nums('dif'), p)),
+    // 変化の線を変えたら「動きあり（変化が線より上か、まばたき直後）」が何%になるか＝次の線決めに使う
+    sweep: [0.03, 0.05, 0.1, 0.2, 0.3, 0.5].map((t) => {
+      const pr = recs.filter((r) => r.pose && r.dif != null);
+      return pr.length ? `${t}→${Math.round(100 * pr.filter((r) => r.dif > t || r.blink).length / pr.length)}` : `${t}→-`;
+    }).join(' '),
     blinks: st.blinks,
     face: Math.round(100 * recs.filter((r) => r.face).length / n),
     pose: Math.round(100 * recs.filter((r) => r.pose).length / n),
@@ -532,7 +543,8 @@ function resultText() {
   for (const r of S.results) {
     if (r.skipped) { L.push(`[${SCENES.find((s) => s.id === r.id).name}] 飛ばした`); continue; }
     L.push(`[${r.name}] ${r.sec}秒(判定${r.judged}秒) 正解${r.ok}%（判定の素${r.rawOk}%） 数え${r.count} 不在${r.away} 静止${r.still} スマホ${r.phone}`);
-    L.push(`  揺れ p10/50/90=${f(r.jit[0], 4)}/${f(r.jit[1], 4)}/${f(r.jit[2], 4)} 変化=${f(r.dif[0], 2)}/${f(r.dif[1], 2)}/${f(r.dif[2], 2)} まばたき${r.blinks}回 顔${r.face}% 体${r.pose}% 手にスマホ${r.hold}% fps${r.fps.toFixed(1)}`);
+    L.push(`  揺れ p10/50/90=${f(r.jit[0], 4)}/${f(r.jit[1], 4)}/${f(r.jit[2], 4)} 変化 最小/p10/50/90=${f(r.dif[0], 2)}/${f(r.dif[1], 2)}/${f(r.dif[2], 2)}/${f(r.dif[3], 2)} まばたき${r.blinks}回 顔${r.face}% 体${r.pose}% 手にスマホ${r.hold}% fps${r.fps.toFixed(1)}`);
+    L.push(`  変化の線ごとの動きあり%: ${r.sweep}`);
     L.push(`  見えた物: ${r.labels || 'なし'}`);
     L.push(`  時系列: ${r.line}`);
   }
@@ -564,7 +576,7 @@ async function copyResult() {
 
 // ---------- しきい値 ----------
 
-const TUNE = [['pJit', 'oJit', 'jit', 3], ['pDiff', 'oDiff', 'diff', 1], ['pBlink', 'oBlink', 'blink', 0], ['pHold', 'oHold', 'hold', 0], ['pObj', 'oObj', 'obj', 2]];
+const TUNE = [['pJit', 'oJit', 'jit', 3], ['pDiff', 'oDiff', 'diff', 2], ['pBlink', 'oBlink', 'blink', 0], ['pHold', 'oHold', 'hold', 0], ['pObj', 'oObj', 'obj', 2]];
 function syncTune() {
   for (const [inp, out, key, dg] of TUNE) { $(inp).value = P[key]; $(out).textContent = Number(P[key]).toFixed(dg); }
 }
@@ -572,16 +584,17 @@ for (const [inp, out, key, dg] of TUNE) {
   $(inp).addEventListener('input', () => {
     P[key] = Number($(inp).value);
     $(out).textContent = P[key].toFixed(dg);
-    localStorage.setItem('studycam.params', JSON.stringify(P));
+    localStorage.setItem(PKEY, JSON.stringify(P));
   });
 }
 $('btnReset').addEventListener('click', () => {
   Object.assign(P, DEFAULTS);
-  localStorage.removeItem('studycam.params');
+  localStorage.removeItem(PKEY);
   syncTune();
 });
 syncTune();
 
+$('ver').textContent = `${APP_VER}${SCENES === ALL_SCENES ? '' : `・${SCENES.length}場面`}`;
 $('btnStart').addEventListener('click', start);
 $('btnTest').addEventListener('click', startTest);
 $('btnScene').addEventListener('click', () => {
