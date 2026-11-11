@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>撮影判定テスト</title>
+<link rel="stylesheet" href="style.css">
+<script type="module" src="app.js"></script>
+</head>
+<body>
+<main>
+  <header>
+    <h1>撮影判定テスト</h1>
+    <p class="sub">勉強している時間だけを数えられるかを試すページです</p>
+  </header>
+
+  <section id="stage">
+    <video id="video" playsinline muted autoplay></video>
+    <canvas id="overlay"></canvas>
+    <div id="badge" class="badge idle">開始を押してください</div>
+  </section>
+
+  <section id="loading" class="panel" hidden>
+    <p id="loadMsg">読み込み中…</p>
+  </section>
+
+  <section id="error" class="panel error" hidden></section>
+
+  <section id="sceneCard" class="panel scene" hidden>
+    <div class="sceneHead"><span id="sceneNo"></span><span id="sceneName"></span></div>
+    <p id="sceneText"></p>
+    <div id="sceneTimer" class="timer"></div>
+    <div class="row">
+      <button id="btnScene" class="primary">この場面を始める</button>
+      <button id="btnSkip">この場面を飛ばす</button>
+    </div>
+  </section>
+
+  <section id="controls" class="row">
+    <button id="btnStart" class="primary">開始（カメラを使う）</button>
+    <button id="btnTest" disabled>試験を始める</button>
+  </section>
+
+  <section id="totals" class="panel">
+    <div class="big"><span class="lbl">数えた時間</span><span id="tCount">0:00</span></div>
+    <div class="row small">
+      <span>人がいない <b id="tAway">0:00</b></span>
+      <span>動きがない <b id="tStill">0:00</b></span>
+      <span>スマホを持っている <b id="tPhone">0:00</b></span>
+    </div>
+  </section>
+
+  <section id="check" class="panel">
+    <span id="ckPose" class="chip">肩・顔 —</span>
+    <span id="ckFace" class="chip">顔（まばたき用） —</span>
+    <span id="ckDesk" class="chip">机 —</span>
+  </section>
+
+  <section id="result" class="panel" hidden>
+    <h2>結果</h2>
+    <button id="btnCopy" class="primary">結果をコピー</button>
+    <span id="copyMsg" class="small"></span>
+    <textarea id="resultText" readonly rows="12"></textarea>
+  </section>
+
+  <details id="metrics" class="panel" open>
+    <summary>判定の数値</summary>
+    <dl>
+      <dt>処理</dt><dd id="mDelegate">—</dd>
+      <dt>fps</dt><dd id="mFps">—</dd>
+      <dt>体の揺れ</dt><dd id="mJit">—</dd>
+      <dt>画素の変化</dt><dd id="mDiff">—</dd>
+      <dt>まばたき</dt><dd id="mBlink">—</dd>
+      <dt>見えた物</dt><dd id="mObj">—</dd>
+      <dt>今の判定</dt><dd id="mRaw">—</dd>
+    </dl>
+  </details>
+
+  <details id="tune" class="panel">
+    <summary>しきい値（変えるとすぐ効きます）</summary>
+    <label>体の揺れ ＞ <output id="oJit"></output><input id="pJit" type="range" min="0.001" max="0.05" step="0.001"></label>
+    <label>画素の変化 ＞ <output id="oDiff"></output><input id="pDiff" type="range" min="0" max="10" step="0.1"></label>
+    <label>まばたきから <output id="oBlink"></output> 秒は動きありとみなす<input id="pBlink" type="range" min="0" max="60" step="1"></label>
+    <label>直近 <output id="oHold"></output> 秒の7割が同じ判定なら切り替え<input id="pHold" type="range" min="1" max="15" step="1"></label>
+    <label>スマホ検出の確からしさ ＞ <output id="oObj"></output><input id="pObj" type="range" min="0.1" max="0.9" step="0.05"></label>
+    <button id="btnReset">初期値に戻す</button>
+  </details>
+
+  <p class="note">映像はこの端末の中だけで処理し、保存も送信もしません。最初の読み込みで判定用のAI（約30MB）を取得します。</p>
+</main>
+</body>
+</html>

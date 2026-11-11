@@ -1,0 +1,131 @@
+:root {
+  --bg: #0f1115;
+  --panel: #181b21;
+  --line: #2a2e36;
+  --text: #e8eaed;
+  --muted: #9aa0a6;
+  --count: #34c759;
+  --still: #ff9f0a;
+  --phone: #ff453a;
+  --away: #8e8e93;
+  --radius: 12px;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--text); }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-text-size-adjust: 100%;
+}
+main {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: max(12px, env(safe-area-inset-top)) 12px max(24px, env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+header h1 { font-size: 20px; margin: 4px 0 0; }
+header .sub { margin: 0; color: var(--muted); font-size: 13px; }
+
+#stage {
+  position: relative;
+  width: 100%;
+  height: 44vh;
+  min-height: 240px;
+  background: #000;
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+#video, #overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+#video { transform: scaleX(-1); }
+.badge {
+  position: absolute;
+  left: 50%;
+  top: 10px;
+  transform: translateX(-50%);
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 18px;
+  white-space: nowrap;
+  background: rgba(0, 0, 0, .6);
+  border: 2px solid var(--line);
+}
+.badge.count { background: var(--count); border-color: var(--count); color: #04210c; }
+.badge.still { background: var(--still); border-color: var(--still); color: #2b1a00; }
+.badge.phone { background: var(--phone); border-color: var(--phone); color: #fff; }
+.badge.away  { background: var(--away);  border-color: var(--away);  color: #111; }
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+}
+.panel.error { border-color: var(--phone); color: #ffb4ae; white-space: pre-wrap; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.small { font-size: 13px; color: var(--muted); }
+.small b { color: var(--text); font-variant-numeric: tabular-nums; }
+.big { display: flex; align-items: baseline; justify-content: space-between; }
+.big .lbl { color: var(--muted); }
+#tCount { font-size: 40px; font-weight: 800; color: var(--count); font-variant-numeric: tabular-nums; }
+#totals .row { justify-content: space-between; }
+
+#check { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip {
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  font-size: 13px;
+  color: var(--muted);
+}
+.chip.ok { border-color: var(--count); color: var(--count); }
+.chip.ng { border-color: var(--phone); color: var(--phone); }
+
+.scene { border-color: #3b82f6; }
+.sceneHead { display: flex; gap: 8px; align-items: baseline; font-weight: 700; font-size: 18px; }
+#sceneNo { color: var(--muted); font-size: 14px; }
+#sceneText { margin: 6px 0; }
+.timer { font-size: 32px; font-weight: 800; font-variant-numeric: tabular-nums; margin: 4px 0 8px; }
+
+button {
+  font: inherit;
+  font-size: 16px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: #232731;
+  color: var(--text);
+}
+button.primary { background: #2563eb; border-color: #2563eb; color: #fff; font-weight: 700; }
+button:disabled { opacity: .4; }
+#controls button { flex: 1; }
+
+#result h2 { font-size: 16px; margin: 0 0 8px; }
+#resultText {
+  width: 100%;
+  margin-top: 8px;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 11px;
+  background: #0b0d10;
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px;
+}
+
+details summary { cursor: pointer; color: var(--muted); }
+dl { display: grid; grid-template-columns: max-content 1fr; gap: 2px 12px; margin: 8px 0 0; font-size: 14px; }
+dt { color: var(--muted); }
+dd { margin: 0; font-variant-numeric: tabular-nums; word-break: break-all; }
+#tune label { display: block; margin: 10px 0; font-size: 14px; }
+#tune input[type=range] { width: 100%; }
+.note { color: var(--muted); font-size: 12px; margin: 4px 2px; }
